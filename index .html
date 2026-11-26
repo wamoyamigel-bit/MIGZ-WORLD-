@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIGZ WORLD</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071018;color:#eaf7ff;font-family:Arial,sans-serif;overflow:hidden}
+#game{display:block;width:100vw;height:100vh;background:#14252a}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.panel{background:#071018dd;border:1px solid #25d7a0;border-radius:10px;padding:9px 12px;font-size:13px}
+#mission{position:fixed;top:68px;left:12px;background:#071018dd;border-left:3px solid #25d7a0;padding:10px 12px;max-width:240px;font-size:13px}
+#controls{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:space-between;padding:0 18px;pointer-events:none}
+.pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:5px;pointer-events:auto}
+button{border:1px solid #35dcb0;background:#102a2b;color:white;border-radius:12px;font-size:20px;touch-action:none}
+.pad button{opacity:.8}.empty{visibility:hidden}
+#actions{display:flex;align-items:end;gap:10px;pointer-events:auto}
+#actions button{font-size:12px;padding:13px 15px}
+#toast{position:fixed;bottom:145px;left:50%;transform:translateX(-50%);background:#071018e8;padding:10px 15px;border-radius:10px;display:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div class="panel"><b>MIGZ WORLD</b><br>OPEN CITY • DEMO</div><div class="panel" id="stats">CASH: KSh 500<br>MISSION: 1</div></div>
+<div id="mission"><b>MISSION 01: FIRST DAY</b><br>Find the green marker and walk into it.</div>
+<div id="controls">
+ <div class="pad">
+  <button class="empty"></button><button data-key="up">▲</button><button class="empty"></button>
+  <button data-key="left">◀</button><button data-key="down">▼</button><button data-key="right">▶</button>
+ </div>
+ <div id="actions"><button id="radio">RADIO: OFF</button><button id="run">RUN</button></div>
+</div><div id="toast"></div>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+let W,H,camX=0,camY=0,keys={},cash=500,done=false,radio=false,fast=false;
+const world={w:2200,h:1600};
+const player={x:260,y:260,r:13,speed:2.5};
+const goal={x:760,y:520,r:25};
+const buildings=[];
+for(let y=80;y<1500;y+=210)for(let x=80;x<2100;x+=250){
+ if(Math.abs(x-260)<150&&Math.abs(y-260)<150)continue;
+ buildings.push({x,y,w:100+(x%70),h:85+(y%55),c:['#344c50','#3e4a5c','#4a5050','#394b42'][Math.floor((x+y)%4)]});
+}
+const cars=Array.from({length:18},(_,i)=>({x:150+(i*113)%1900,y:160+(i*179)%1300,c:['#d6a33b','#3d9c91','#a94b4b','#7c8fb3'][i%4]}));
+function resize(){W=canvas.width=innerWidth*devicePixelRatio;H=canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=innerWidth;H=innerHeight}
+addEventListener('resize',resize);resize();
+function roadGrid(){
+ ctx.fillStyle='#263a38';ctx.fillRect(0,0,world.w,world.h);
+ ctx.fillStyle='#182a2c';
+ for(let x=0;x<world.w;x+=250)ctx.fillRect(x-30,0,60,world.h);
+ for(let y=0;y<world.h;y+=210)ctx.fillRect(0,y-30,world.w,60);
+ ctx.strokeStyle='#8b9b7c';ctx.setLineDash([18,20]);ctx.lineWidth=2;
+ for(let x=0;x<world.w;x+=250){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,world.h);ctx.stroke()}
+ for(let y=0;y<world.h;y+=210){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(world.w,y);ctx.stroke()}
+ ctx.setLineDash([]);
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);camX=Math.max(0,Math.min(world.w-W,player.x-W/2));camY=Math.max(0,Math.min(world.h-H,player.y-H/2));
+ ctx.save();ctx.translate(-camX,-camY);roadGrid();
+ buildings.forEach(b=>{ctx.fillStyle='#101b1c';ctx.fillRect(b.x+7,b.y+8,b.w,b.h);ctx.fillStyle=b.c;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle='#829b91';for(let xx=b.x+12;xx<b.x+b.w-8;xx+=25)for(let yy=b.y+12;yy<b.y+b.h-8;yy+=24){ctx.fillRect(xx,yy,9,8)}});
+ cars.forEach(c=>{ctx.fillStyle=c.c;ctx.fillRect(c.x,c.y,34,17);ctx.fillStyle='#d8e5dc';ctx.fillRect(c.x+7,c.y+3,10,10)});
+ if(!done){ctx.beginPath();ctx.arc(goal.x,goal.y,goal.r+8,0,Math.PI*2);ctx.strokeStyle='#29f0a8';ctx.lineWidth=4;ctx.stroke();ctx.fillStyle='#29f0a8';ctx.beginPath();ctx.arc(goal.x,goal.y,8,0,Math.PI*2);ctx.fill()}
+ ctx.fillStyle='#f0c38a';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1c8d77';ctx.fillRect(player.x-10,player.y+9,20,13);ctx.fillStyle='#111';ctx.fillRect(player.x-8,player.y+20,6,7);ctx.fillRect(player.x+3,player.y+20,6,7);
+ ctx.restore();
+}
+function update(){let dx=0,dy=0;if(keys.up||keys.w)dy--;if(keys.down||keys.s)dy++;if(keys.left||keys.a)dx--;if(keys.right||keys.d)dx++;let n=Math.hypot(dx,dy)||1;let sp=player.speed*(fast?1.8:1);player.x=Math.max(15,Math.min(world.w-15,player.x+dx/n*sp));player.y=Math.max(15,Math.min(world.h-15,player.y+dy/n*sp));
+ if(!done&&Math.hypot(player.x-goal.x,player.y-goal.y)<42){done=true;cash+=500;document.getElementById('stats').innerHTML='CASH: KSh '+cash+'<br>MISSION: COMPLETE';document.getElementById('mission').innerHTML='<b>MISSION COMPLETE!</b><br>You found the city marker. Explore the demo city.';toast('Mission complete! +KSh 500');}
+ draw();requestAnimationFrame(update)}
+function toast(t){let el=document.getElementById('toast');el.textContent=t;el.style.display='block';setTimeout(()=>el.style.display='none',2200)}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+document.getElementById('run').onclick=()=>{fast=!fast;document.getElementById('run').textContent=fast?'WALK':'RUN'};
+document.getElementById('radio').onclick=()=>{radio=!radio;document.getElementById('radio').textContent='RADIO: '+(radio?'ON':'OFF');toast(radio?'Radio demo enabled':'Radio off')};
+update();
+</script></body></html>
